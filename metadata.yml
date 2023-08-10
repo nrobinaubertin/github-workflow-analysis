@@ -6,6 +6,7 @@ plugins:
       layout:
         - [runs-count, runs-result, results-count]
         - [runs-day-result,runs-day-result,runs-day-result]
+        - [runs-day-failure,runs-day-failure,runs-day-failure]
       filters:
         repository:
           name: Repositories
@@ -82,3 +83,40 @@ plugins:
               x: { field: day, type: ordinal, timeUnit: yearmonthdate }
               y: { field: count, type: quantitative }
               color: { field: conclusion, type: nominal }
+        runs-day-failure:
+          title: Runs by day by result
+          db: gwf
+          query: |
+            SELECT
+            date(runs.run_started_at) as day,
+            CASE
+              WHEN logs.log_content LIKE '%Timed out waiting for model%' THEN 'Timed out waiting for model'
+              WHEN logs.log_content LIKE '%Unit in error: postgresql-k8s%' THEN 'Unit in error: postgresql-k8s'
+              ELSE 'Other'  -- Handle cases that don't match any of the specific failures
+            END as failure_type,
+            COUNT(*) as count
+            FROM
+              runs
+              JOIN logs ON runs.id = logs.run_id
+              JOIN repositories ON runs.repository_id = repositories.id
+            WHERE
+              logs.log_identifier LIKE '%Integration%'
+              AND logs.log_content LIKE '%pytest_operator.plugin:plugin.py:675 Connecting to existing model%'
+              AND runs.conclusion = 'failure'
+              AND repositories.name = :repository
+            GROUP BY
+              day,
+              failure_type
+            ORDER BY
+              day;
+          library: vega-lite
+          display:
+            mark: { type: bar, tooltip: true }
+            params:
+              - name: highlight
+                select: { fields: [failure_type], type: point, "on": mouseover }
+                bind: legend
+            encoding:
+              x: { field: day, type: ordinal, timeUnit: yearmonthdate }
+              y: { field: count, type: quantitative }
+              color: { field: failure_type, type: nominal }

@@ -2,14 +2,16 @@ import json
 
 import requests
 import db
+import logs
 
 # Declare some run constants
-with open('config.json', 'r') as config_file:
+with open("config.json", "r") as config_file:
     config = json.load(config_file)
     TOKEN = config["token"]
     OWNER = config["owner"]
     DB_NAME = config["db_name"]
     REPOSITORIES = config["repositories"]
+
 
 def get_data_for_repo(sqlite_file, repo):
     # Define the date one month ago
@@ -33,6 +35,7 @@ def get_data_for_repo(sqlite_file, repo):
         runs = response.json()
         for run in runs["workflow_runs"]:
             if not db.run_exists(conn, run["id"]):
+                run["logs"] = logs.fetch(run["logs_url"], conn, headers)
                 store_run(conn, run)
                 new_stored_run = True
                 print(f"Stored run {run['run_number']}.")
@@ -119,10 +122,20 @@ def store_run(conn, data):
             data["workflow_url"],
             data["actor"]["id"],
             data["head_commit"]["id"],
-            data["referenced_workflows"][0]["sha"] if len(data["referenced_workflows"]) else "",
+            data["referenced_workflows"][0]["sha"]
+            if len(data["referenced_workflows"])
+            else "",
             data["repository"]["id"],
         ),
     )
+
+    for name in data["logs"]:
+        conn.execute(
+            """
+            INSERT INTO logs(run_id, log_identifier, log_content) VALUES(?, ?, ?)
+        """,
+            (data["id"], name, data["logs"][name]),
+        )
 
     conn.commit()
 

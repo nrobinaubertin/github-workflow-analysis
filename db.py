@@ -104,6 +104,16 @@ def create_tables(conn):
         FOREIGN KEY (job_id) REFERENCES jobs (id)
     )"""
 
+    logs_table = """
+    CREATE TABLE logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        run_id INTEGER, 
+        log_identifier TEXT,
+        log_content TEXT,
+        FOREIGN KEY (run_id) REFERENCES runs(id) ON DELETE CASCADE
+    );
+    """
+
     try:
         c = conn.cursor()
         c.execute(runs_table)
@@ -112,6 +122,7 @@ def create_tables(conn):
         c.execute(repositories_table)
         c.execute(jobs_table)
         c.execute(steps_table)
+        c.execute(logs_table)
     except sqlite3.Error as e:
         print(e)
 
