@@ -1,7 +1,9 @@
 import json
+import sys
+from time import sleep
 
 import requests
-import db
+import postgres as db
 import logs
 
 # Declare some run constants
@@ -10,16 +12,17 @@ with open("config.json", "r") as config_file:
     TOKEN = config["token"]
     OWNER = config["owner"]
     DB_NAME = config["db_name"]
+    DB_DSN = config["db_dsn"]
     REPOSITORIES = config["repositories"]
 
 
-def get_data_for_repo(sqlite_file, repo):
+def get_data_for_repo(db_dsn, repo):
     # Define the date one month ago
     # format datetime object as ISO 8601 string
     base_url = f"https://api.github.com/repos/{OWNER}/{repo}/actions/runs"
     headers = {"Authorization": f"token {TOKEN}"}
 
-    conn = db.create_connection(sqlite_file)
+    conn = db.create_connection(db_dsn)
 
     if conn is None:
         print("Error! Cannot create the database connection.")
@@ -33,6 +36,9 @@ def get_data_for_repo(sqlite_file, repo):
         url = base_url + "?" + "status=completed&per_page=100" + f"&page={page + 1}"
         response = requests.get(url, headers=headers, timeout=10)
         runs = response.json()
+        if "workflow_runs" not in runs:
+            print(runs)
+            sys.exit("Something went wrong during the runs fetch")
         for run in runs["workflow_runs"]:
             if not db.run_exists(conn, run["id"]):
                 run["logs"] = logs.fetch(run["logs_url"], conn, headers)
@@ -42,6 +48,7 @@ def get_data_for_repo(sqlite_file, repo):
 
                 # query jobs
                 if "jobs_url" in run:
+                    sleep(1)
                     response = requests.get(
                         run["jobs_url"], headers=headers, timeout=10
                     )
@@ -52,8 +59,9 @@ def get_data_for_repo(sqlite_file, repo):
                             db.insert_step(conn, step, job["id"])
         if not new_stored_run:
             pages_without_new_stored_run += 1
-        if pages_without_new_stored_run > 2:
+        if pages_without_new_stored_run > 4:
             break
+        sleep(1)
 
     print(f"Finished scanning {repo}.")
 
@@ -132,14 +140,12 @@ def store_run(conn, data):
     for name in data["logs"]:
         conn.execute(
             """
-            INSERT INTO logs(run_id, log_identifier, log_content) VALUES(?, ?, ?)
+            INSERT INTO logs(run_id, log_identifier, log_content) VALUES(%s, %s, %s)
         """,
             (data["id"], name, data["logs"][name]),
         )
 
-    conn.commit()
 
-
-db.setup_database(DB_NAME)
+db.setup_database(DB_DSN)
 for repo in REPOSITORIES:
-    get_data_for_repo(DB_NAME, repo)
+    get_data_for_repo(DB_DSN, repo)
