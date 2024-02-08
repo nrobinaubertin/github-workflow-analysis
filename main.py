@@ -67,6 +67,7 @@ def get_data_for_repo(db_dsn, repo):
 
     print(f"Finished scanning {repo}.")
 
+
 # remove NUL bytes that text fields cannot store (in PostgreSQL)
 def clean_nul_bytes(value):
     if isinstance(value, dict):
@@ -74,9 +75,10 @@ def clean_nul_bytes(value):
     elif isinstance(value, list):
         return [clean_nul_bytes(item) for item in value]
     elif isinstance(value, str):
-        return value.replace('\x00', '')
+        return value.replace("\x00", "")
     else:
         return value
+
 
 def store_run(conn, data):
     data = clean_nul_bytes(data)

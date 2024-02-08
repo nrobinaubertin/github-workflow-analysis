@@ -1,5 +1,6 @@
 import psycopg
 
+
 def create_connection(postgres_dsn):
     conn = None
     try:
@@ -8,6 +9,7 @@ def create_connection(postgres_dsn):
     except psycopg.Error as e:
         print(e)
     return conn
+
 
 def create_tables(conn):
     runs_table = """CREATE TABLE IF NOT EXISTS runs (
