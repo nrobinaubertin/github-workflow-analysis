@@ -6,6 +6,8 @@ import requests
 import postgres as db
 import logs
 
+SLEEP_TIMEOUT = 4
+
 # Declare some run constants
 with open("config.json", "r") as config_file:
     config = json.load(config_file)
@@ -48,7 +50,7 @@ def get_data_for_repo(db_dsn, repo):
 
                 # query jobs
                 if "jobs_url" in run:
-                    sleep(1)
+                    sleep(SLEEP_TIMEOUT)
                     response = requests.get(
                         run["jobs_url"], headers=headers, timeout=10
                     )
@@ -59,15 +61,25 @@ def get_data_for_repo(db_dsn, repo):
                             db.insert_step(conn, step, job["id"])
         if not new_stored_run:
             pages_without_new_stored_run += 1
-        if pages_without_new_stored_run > 4:
+        if pages_without_new_stored_run > 3:
             break
-        sleep(1)
+        sleep(SLEEP_TIMEOUT)
 
     print(f"Finished scanning {repo}.")
 
+# remove NUL bytes that text fields cannot store (in PostgreSQL)
+def clean_nul_bytes(value):
+    if isinstance(value, dict):
+        return {k: clean_nul_bytes(v) for k, v in value.items()}
+    elif isinstance(value, list):
+        return [clean_nul_bytes(item) for item in value]
+    elif isinstance(value, str):
+        return value.replace('\x00', '')
+    else:
+        return value
 
 def store_run(conn, data):
-    # Insert actor, commit, and repository data first to get their ids
+    data = clean_nul_bytes(data)
     db.insert_actor(
         conn,
         (
@@ -136,7 +148,6 @@ def store_run(conn, data):
             data["repository"]["id"],
         ),
     )
-
     for name in data["logs"]:
         conn.execute(
             """
