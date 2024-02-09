@@ -18,9 +18,10 @@ The goal of this repository is to propose a quick and direty way to extract data
 }
 ```
 3. Deploy [postgres using docker](https://hub.docker.com/_/postgres)
-4. Launch the script to extract the data from your pipelines: `python3 ./main.py`
-5. Deploy [metabase using docker](https://hub.docker.com/r/metabase/metabase)
-6. Connect your database to metabase and start analysing !
+4. Install dependencies: `pip install --user -r requirements.txt`
+5. Launch the script to extract the data from your pipelines: `python3 ./main.py`
+6. Deploy [metabase using docker](https://hub.docker.com/r/metabase/metabase)
+7. Connect your database to metabase and start analysing !
 
 ## Some possible analysis
 
